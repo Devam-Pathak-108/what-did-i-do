@@ -15,6 +15,24 @@ class ChatSessionResponse(BaseModel):
     updated_at: datetime
 
 
+class ChatSessionListItem(BaseModel):
+    session_id: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    first_message: str | None = Field(
+        default=None,
+        description="First user message (type=asked) in this session, if any",
+    )
+
+
+class ChatSessionListResponse(BaseModel):
+    page: int
+    limit: int
+    total: int
+    sessions: list[ChatSessionListItem]
+
+
 class ChatMessageItem(BaseModel):
     message_id: str
     type: str = Field(description='"asked" or "reply"')

@@ -7,6 +7,7 @@ from app.schemas.chat import (
     ChatHistoryResponse,
     ChatSendRequest,
     ChatSendResponse,
+    ChatSessionListResponse,
     ChatSessionResponse,
 )
 from app.services import chat_service
@@ -27,6 +28,21 @@ async def create_chat_session(
         created_at=to_ist(session["created_at"]),
         updated_at=to_ist(session["updated_at"]),
     )
+
+
+@router.get("/sessions", response_model=ChatSessionListResponse)
+async def list_chat_sessions(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: dict[str, Any] = Depends(get_current_verified_user),
+) -> ChatSessionListResponse:
+    """List all chat sessions for the current user, with first user message text."""
+    result = await chat_service.list_sessions(
+        user_id=current_user["id"],
+        page=page,
+        limit=limit,
+    )
+    return ChatSessionListResponse(**result)
 
 
 @router.post("", response_model=ChatSendResponse)

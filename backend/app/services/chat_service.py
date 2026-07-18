@@ -82,6 +82,65 @@ async def get_or_create_session(user_id: str, session_id: str | None = None) -> 
     return await create_session(user_id, make_active=True)
 
 
+async def list_sessions(
+    user_id: str,
+    page: int = 1,
+    limit: int = 20,
+) -> dict[str, Any]:
+    if page < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="page must be >= 1",
+        )
+    if limit < 1 or limit > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="limit must be between 1 and 100",
+        )
+
+    db = get_database()
+    user_oid = _as_object_id(user_id, "user_id")
+    query = {"user_id": user_oid}
+    total = await db.chat_sessions.count_documents(query)
+    skip = (page - 1) * limit
+
+    cursor = (
+        db.chat_sessions.find(query)
+        .sort("updated_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+    sessions = await cursor.to_list(length=limit)
+
+    items: list[dict[str, Any]] = []
+    for session in sessions:
+        first = await db.chat_messages.find_one(
+            {
+                "user_id": user_oid,
+                "session_id": session["_id"],
+                "type": "asked",
+                "visible_in_chat": True,
+            },
+            sort=[("datetime", 1)],
+        )
+        items.append(
+            {
+                "session_id": str(session["_id"]),
+                "is_active": bool(session.get("is_active", False)),
+                "created_at": to_ist(session["created_at"]),
+                "updated_at": to_ist(session["updated_at"]),
+                "first_message": first.get("message") if first else None,
+            }
+        )
+
+    return {
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "sessions": items,
+    }
+
+
 async def _touch_session(session_id: ObjectId) -> None:
     db = get_database()
     await db.chat_sessions.update_one(
