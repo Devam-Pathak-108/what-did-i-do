@@ -10,3 +10,4 @@ aiosmtplib>=3.0.2
 certifi>=2024.0.0
 python-dotenv>=1.0.1
 tzdata>=2024.1
+python:3.12.8

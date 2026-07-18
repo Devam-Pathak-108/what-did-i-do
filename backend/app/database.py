@@ -1,4 +1,5 @@
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+import certifi
 
 from app.config import get_settings
 
@@ -9,7 +10,7 @@ _db: AsyncIOMotorDatabase | None = None
 async def connect_to_mongo() -> None:
     global _client, _db
     settings = get_settings()
-    _client = AsyncIOMotorClient(settings.mongodb_uri)
+    _client = AsyncIOMotorClient(settings.mongodb_uri, tlsCAFile=certifi.where())
     _db = _client[settings.mongodb_db_name]
 
     await _db.users.create_index("email", unique=True)
