@@ -197,7 +197,7 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
               ? 'Listening… speak now'
               : 'Message What Did I Do… (Enter to send)'
           }
-          className="max-h-32 min-h-[40px] flex-1 resize-none bg-transparent px-1 py-2 text-sm text-text placeholder:text-text-muted focus-visible:outline-none"
+          className="max-h-32 min-h-[40px] flex-1 resize-none bg-transparent px-1 py-2 text-sm text-text focus-visible:outline-none"
         />
 
         <IconButton
@@ -205,7 +205,7 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
           label="Send message"
           size="md"
           disabled={disabled || !value.trim()}
-          className="shrink-0 bg-accent text-white hover:bg-accent-hover disabled:bg-surface-muted disabled:text-text-muted"
+          className="shrink-0 bg-accent text-white hover:bg-accent-hover"
         >
           <SendIcon className="h-5 w-5" />
         </IconButton>

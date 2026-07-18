@@ -1,12 +1,8 @@
-export type AuthUser = {
-  username: string
-  email: string
-  password: string
-}
-
 export type AuthSession = {
+  userId: string
   username: string
   email: string
+  accessToken: string
 }
 
 export type AuthMode = 'login' | 'signup'

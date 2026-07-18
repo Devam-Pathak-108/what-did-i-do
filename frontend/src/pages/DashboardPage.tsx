@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AppShell } from '../components/layout/AppShell'
 import { Sidebar } from '../components/layout/Sidebar'
+import { SidebarNav } from '../components/layout/SidebarNav'
 import { UserProfile } from '../components/profile/UserProfile'
+import { ProfilePanel } from '../components/profile/ProfilePanel'
 import { ChatHistoryList } from '../components/history/ChatHistoryList'
 import { SpeakButton } from '../components/speak/SpeakButton'
 import { AboutApp } from '../components/about/AboutApp'
@@ -10,8 +12,13 @@ import { ChatPanel } from '../components/chat/ChatPanel'
 import { Button } from '../components/ui/Button'
 import { mockConversations } from '../data/mockConversations'
 import { mockMessagesByConversation } from '../data/mockMessages'
+import { getProfile, type ProfileResponse } from '../lib/api'
+import { clearSession, loadSession, saveSession } from '../lib/session'
+import { useToast } from '../components/ui/toast-context'
 import type { AuthMode, AuthSession } from '../types/auth'
 import type { ChatMessage } from '../types/chat'
+
+type MainView = 'home' | 'chat' | 'profile'
 
 function findConversationTitle(id: string): string {
   for (const group of mockConversations) {
@@ -25,10 +32,24 @@ function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+function applyProfileToSession(
+  session: AuthSession,
+  profile: ProfileResponse,
+): AuthSession {
+  return {
+    ...session,
+    userId: profile.user_id,
+    username: profile.username,
+    email: profile.email,
+  }
+}
+
 export function DashboardPage() {
-  const [session, setSession] = useState<AuthSession | null>(null)
+  const toast = useToast()
+  const [session, setSession] = useState<AuthSession | null>(() => loadSession())
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('login')
+  const [mainView, setMainView] = useState<MainView>('home')
   const [activeId, setActiveId] = useState<string | null>(null)
   const [listening, setListening] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
@@ -43,23 +64,60 @@ export function DashboardPage() {
     [activeId],
   )
 
+  const handleProfileLoaded = useCallback((profile: ProfileResponse) => {
+    setSession((prev) => {
+      if (!prev) return prev
+      const next = applyProfileToSession(prev, profile)
+      saveSession(next)
+      return next
+    })
+  }, [])
+
+  // Load profile whenever the user is logged in (including session restore).
+  useEffect(() => {
+    if (!session?.accessToken) return
+    const token: string = session.accessToken
+
+    let cancelled = false
+
+    async function load() {
+      try {
+        const profile = await getProfile(token)
+        if (cancelled) return
+        handleProfileLoaded(profile)
+      } catch {
+        // Keep existing session details if profile fetch fails.
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [session?.accessToken, handleProfileLoaded])
+
   function openAuth(mode: AuthMode = 'login') {
     setAuthMode(mode)
     setAuthOpen(true)
   }
 
   function handleAuthenticated(next: AuthSession) {
+    saveSession(next)
     setSession(next)
     setShowWelcome(true)
     setActiveId(null)
     setListening(false)
+    setMainView('home')
   }
 
   function handleLogout() {
+    clearSession()
     setSession(null)
     setShowWelcome(false)
     setListening(false)
     setActiveId(null)
+    setMainView('home')
+    toast.info('You have been signed out.', 'Logged out')
   }
 
   function handleSend(text: string) {
@@ -120,22 +178,44 @@ export function DashboardPage() {
             }
           >
             {isLoggedIn ? (
-              <ChatHistoryList
-                groups={mockConversations}
-                activeId={activeId}
-                onSelect={(id) => {
-                  setActiveId(id)
-                  setShowWelcome(false)
-                  setListening(false)
-                }}
-              />
+              <>
+                <SidebarNav
+                  active={mainView === 'profile' ? 'profile' : 'chats'}
+                  onProfileClick={() => {
+                    setMainView('profile')
+                    setActiveId(null)
+                    setShowWelcome(false)
+                    setListening(false)
+                  }}
+                  onChatsClick={() => {
+                    setMainView('home')
+                    setActiveId(null)
+                    setListening(false)
+                  }}
+                />
+                <ChatHistoryList
+                  groups={mockConversations}
+                  activeId={mainView === 'chat' ? activeId : null}
+                  onSelect={(id) => {
+                    setActiveId(id)
+                    setMainView('chat')
+                    setShowWelcome(false)
+                    setListening(false)
+                  }}
+                />
+              </>
             ) : (
               <AboutApp onLoginClick={() => openAuth('login')} />
             )}
           </Sidebar>
         }
       >
-        {isLoggedIn && activeId ? (
+        {isLoggedIn && mainView === 'profile' ? (
+          <ProfilePanel
+            token={session.accessToken}
+            onProfileLoaded={handleProfileLoaded}
+          />
+        ) : isLoggedIn && mainView === 'chat' && activeId ? (
           <ChatPanel
             title={activeTitle}
             messages={activeMessages}
@@ -150,8 +230,8 @@ export function DashboardPage() {
                   Welcome, {session.username}
                 </p>
                 <p className="mt-1 text-sm leading-relaxed text-text-muted">
-                  You are signed in. Open a chat from history, or tap the mic to
-                  start speaking about your day.
+                  You are signed in. Open My Profile, pick a chat, or tap the mic
+                  to start speaking about your day.
                 </p>
                 <button
                   type="button"
