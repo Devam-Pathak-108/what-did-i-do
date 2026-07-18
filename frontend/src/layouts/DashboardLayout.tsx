@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { AppShell } from '../components/layout/AppShell'
 import { Sidebar } from '../components/layout/Sidebar'
@@ -8,6 +9,7 @@ import { AboutApp } from '../components/about/AboutApp'
 import { AuthDialog } from '../components/auth/AuthDialog'
 import { Button } from '../components/ui/Button'
 import { useDashboard } from '../context/useDashboard'
+import { groupConversationsByDate } from '../lib/chatSessions'
 
 export function DashboardLayout() {
   const navigate = useNavigate()
@@ -16,6 +18,7 @@ export function DashboardLayout() {
     session,
     isLoggedIn,
     conversations,
+    conversationsLoading,
     openAuth,
     closeAuth,
     authOpen,
@@ -23,6 +26,11 @@ export function DashboardLayout() {
     handleAuthenticated,
     handleLogout,
   } = useDashboard()
+
+  const historyGroups = useMemo(
+    () => groupConversationsByDate(conversations),
+    [conversations],
+  )
 
   const activeChatId = location.pathname.startsWith('/chat/')
     ? decodeURIComponent(location.pathname.slice('/chat/'.length)) || null
@@ -95,11 +103,8 @@ export function DashboardLayout() {
               <>
                 <SidebarNav />
                 <ChatHistoryList
-                  groups={
-                    conversations.length > 0
-                      ? [{ dateLabel: 'Recent', items: conversations }]
-                      : []
-                  }
+                  groups={historyGroups}
+                  loading={conversationsLoading}
                   activeId={activeChatId}
                   onSelect={(id) => {
                     navigate(`/chat/${id}`)

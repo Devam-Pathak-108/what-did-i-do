@@ -66,7 +66,7 @@ function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
 }
 
 type ChatComposerProps = {
-  onSend: (text: string) => void
+  onSend: (text: string) => void | Promise<void>
   disabled?: boolean
 }
 
@@ -144,13 +144,18 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
     }
   }
 
-  function submit() {
+  async function submit() {
     const trimmed = value.trim()
     if (!trimmed || disabled) return
     if (listening) stopListening()
-    onSend(trimmed)
     setValue('')
     baseValueRef.current = ''
+    try {
+      await onSend(trimmed)
+    } catch {
+      setValue(trimmed)
+      baseValueRef.current = trimmed
+    }
   }
 
   function handleSubmit(event: FormEvent) {

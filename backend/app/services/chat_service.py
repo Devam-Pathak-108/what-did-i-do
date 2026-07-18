@@ -453,6 +453,76 @@ async def send_chat(
     }
 
 
+async def list_sessions(
+    user_id: str,
+    page: int = 1,
+    limit: int = 20,
+) -> dict[str, Any]:
+    if page < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="page must be >= 1",
+        )
+    if limit < 1 or limit > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="limit must be between 1 and 100",
+        )
+
+    db = get_database()
+    user_oid = _as_object_id(user_id, "user_id")
+    query = {"user_id": user_oid}
+
+    total = await db.chat_sessions.count_documents(query)
+    skip = (page - 1) * limit
+    cursor = (
+        db.chat_sessions.find(query)
+        .sort("updated_at", -1)
+        .skip(skip)
+        .limit(limit)
+    )
+    sessions = await cursor.to_list(length=limit)
+
+    session_ids = [doc["_id"] for doc in sessions]
+    first_by_session: dict[ObjectId, str] = {}
+    if session_ids:
+        pipeline = [
+            {
+                "$match": {
+                    "user_id": user_oid,
+                    "session_id": {"$in": session_ids},
+                    "type": "asked",
+                    "visible_in_chat": True,
+                }
+            },
+            {"$sort": {"datetime": 1}},
+            {
+                "$group": {
+                    "_id": "$session_id",
+                    "first_message": {"$first": "$message"},
+                }
+            },
+        ]
+        async for row in db.chat_messages.aggregate(pipeline):
+            first_by_session[row["_id"]] = row["first_message"]
+
+    return {
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "sessions": [
+            {
+                "session_id": str(doc["_id"]),
+                "is_active": bool(doc.get("is_active", False)),
+                "created_at": to_ist(doc["created_at"]),
+                "updated_at": to_ist(doc["updated_at"]),
+                "first_message": first_by_session.get(doc["_id"]),
+            }
+            for doc in sessions
+        ],
+    }
+
+
 async def get_chat_history(
     user_id: str,
     session_id: str | None = None,

@@ -7,6 +7,7 @@ export type DashboardContextValue = {
   session: AuthSession | null
   isLoggedIn: boolean
   conversations: Conversation[]
+  conversationsLoading: boolean
   messagesById: Record<string, ChatMessage[]>
   showWelcome: boolean
   setShowWelcome: (value: boolean) => void
@@ -19,13 +20,15 @@ export type DashboardContextValue = {
   handleAuthenticated: (session: AuthSession) => void
   handleLogout: () => void
   handleProfileLoaded: (profile: ProfileResponse) => void
-  handleSend: (conversationId: string, text: string) => void
+  handleSend: (conversationId: string, text: string) => Promise<void>
   getMessages: (conversationId: string) => ChatMessage[]
   setConversationMessages: (
     conversationId: string,
     messages: ChatMessage[],
   ) => void
   addConversation: (conversation: Conversation) => void
+  refreshConversations: () => Promise<void>
+  loadConversationMessages: (conversationId: string) => Promise<void>
 }
 
 export const DashboardContext = createContext<DashboardContextValue | null>(null)

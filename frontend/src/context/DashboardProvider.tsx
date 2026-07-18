@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { getProfile, type ProfileResponse } from '../lib/api'
+import {
+  getChatMessages,
+  getProfile,
+  listChatSessions,
+  sendChatMessage,
+  type ChatMessageItem,
+  type ProfileResponse,
+} from '../lib/api'
+import { mapSessionToConversation } from '../lib/chatSessions'
 import { clearSession, loadSession, saveSession } from '../lib/session'
 import type { AuthMode, AuthSession } from '../types/auth'
 import type { ChatMessage, Conversation } from '../types/chat'
@@ -8,10 +16,6 @@ import {
   DashboardContext,
   type DashboardContextValue,
 } from './dashboard-context'
-
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
 
 function applyProfileToSession(
   session: AuthSession,
@@ -25,14 +29,34 @@ function applyProfileToSession(
   }
 }
 
+function mapApiMessages(items: ChatMessageItem[]): ChatMessage[] {
+  return [...items]
+    .sort(
+      (a, b) =>
+        new Date(a.datetime).getTime() - new Date(b.datetime).getTime(),
+    )
+    .map((item) => ({
+      id: item.message_id,
+      role: item.type === 'asked' ? 'user' : 'assistant',
+      content: item.message,
+      createdAt:
+        typeof item.datetime === 'string'
+          ? item.datetime
+          : new Date(item.datetime).toISOString(),
+    }))
+}
+
 export function DashboardProvider({ children }: { children: ReactNode }) {
-  const toast = useToast()
+  const { error: showError, info: showInfo } = useToast()
   const [session, setSession] = useState<AuthSession | null>(() => loadSession())
   const [authOpen, setAuthOpen] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [listening, setListening] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
   const [conversations, setConversations] = useState<Conversation[]>([])
+  const [conversationsLoading, setConversationsLoading] = useState(
+    () => Boolean(loadSession()?.accessToken),
+  )
   const [messagesById, setMessagesById] = useState<Record<string, ChatMessage[]>>(
     {},
   )
@@ -46,12 +70,31 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const refreshConversations = useCallback(async () => {
+    const token = session?.accessToken
+    if (!token) {
+      setConversations([])
+      setConversationsLoading(false)
+      return
+    }
+
+    try {
+      const data = await listChatSessions(token, { page: 1, limit: 50 })
+      setConversations(data.sessions.map(mapSessionToConversation))
+    } catch (err) {
+      showError(
+        err instanceof Error ? err.message : 'Could not load chat history',
+        'Chat history',
+      )
+    }
+  }, [session?.accessToken, showError])
+
   useEffect(() => {
     if (!session?.accessToken) return
     const token: string = session.accessToken
     let cancelled = false
 
-    async function load() {
+    async function loadProfile() {
       try {
         const profile = await getProfile(token)
         if (cancelled) return
@@ -61,11 +104,42 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    void load()
+    void loadProfile()
     return () => {
       cancelled = true
     }
   }, [session?.accessToken, handleProfileLoaded])
+
+  useEffect(() => {
+    if (!session?.accessToken) {
+      return
+    }
+
+    let cancelled = false
+    const token = session.accessToken
+
+    async function loadSessions() {
+      try {
+        const data = await listChatSessions(token, { page: 1, limit: 50 })
+        if (cancelled) return
+        setConversations(data.sessions.map(mapSessionToConversation))
+      } catch (err) {
+        if (!cancelled) {
+          showError(
+            err instanceof Error ? err.message : 'Could not load chat history',
+            'Chat history',
+          )
+        }
+      } finally {
+        if (!cancelled) setConversationsLoading(false)
+      }
+    }
+
+    void loadSessions()
+    return () => {
+      cancelled = true
+    }
+  }, [session?.accessToken, showError])
 
   const openAuth = useCallback((mode: AuthMode = 'login') => {
     setAuthMode(mode)
@@ -81,6 +155,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setSession(next)
     setShowWelcome(true)
     setListening(false)
+    setConversationsLoading(true)
   }, [])
 
   const handleLogout = useCallback(() => {
@@ -89,9 +164,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setShowWelcome(false)
     setListening(false)
     setConversations([])
+    setConversationsLoading(false)
     setMessagesById({})
-    toast.info('You have been signed out.', 'Logged out')
-  }, [toast])
+    showInfo('You have been signed out.', 'Logged out')
+  }, [showInfo])
 
   const setConversationMessages = useCallback(
     (conversationId: string, messages: ChatMessage[]) => {
@@ -105,35 +181,65 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const addConversation = useCallback((conversation: Conversation) => {
     setConversations((prev) => {
-      if (prev.some((item) => item.id === conversation.id)) return prev
-      return [conversation, ...prev]
+      const without = prev.filter((item) => item.id !== conversation.id)
+      return [conversation, ...without]
     })
   }, [])
 
-  const handleSend = useCallback((conversationId: string, text: string) => {
-    const now = new Date().toISOString()
-    const userMessage: ChatMessage = {
-      id: createId('user'),
-      role: 'user',
-      content: text,
-      createdAt: now,
-    }
-    const assistantMessage: ChatMessage = {
-      id: createId('assistant'),
-      role: 'assistant',
-      content: 'Got it — I have added that to this conversation.',
-      createdAt: new Date().toISOString(),
-    }
+  const loadConversationMessages = useCallback(
+    async (conversationId: string) => {
+      const token = session?.accessToken
+      if (!token) return
 
-    setMessagesById((prev) => ({
-      ...prev,
-      [conversationId]: [
-        ...(prev[conversationId] ?? []),
-        userMessage,
-        assistantMessage,
-      ],
-    }))
-  }, [])
+      try {
+        const data = await getChatMessages(token, {
+          session_id: conversationId,
+          page: 1,
+          limit: 50,
+        })
+        setConversationMessages(conversationId, mapApiMessages(data.messages))
+      } catch (err) {
+        showError(
+          err instanceof Error ? err.message : 'Could not load messages',
+          'Chat',
+        )
+      }
+    },
+    [session?.accessToken, setConversationMessages, showError],
+  )
+
+  const handleSend = useCallback(
+    async (conversationId: string, text: string) => {
+      const token = session?.accessToken
+      const rawData = text.trim()
+      if (!token || !rawData) return
+
+      try {
+        const chat = await sendChatMessage(token, {
+          raw_data: rawData,
+          session_id: conversationId,
+        })
+        const incoming = mapApiMessages(chat.messages)
+        setMessagesById((prev) => {
+          const existing = prev[conversationId] ?? []
+          const seen = new Set(existing.map((item) => item.id))
+          const toAdd = incoming.filter((item) => !seen.has(item.id))
+          return {
+            ...prev,
+            [conversationId]: [...existing, ...toAdd],
+          }
+        })
+        void refreshConversations()
+      } catch (err) {
+        showError(
+          err instanceof Error ? err.message : 'Could not send message',
+          'Chat',
+        )
+        throw err
+      }
+    },
+    [session?.accessToken, refreshConversations, showError],
+  )
 
   const getMessages = useCallback(
     (conversationId: string) => messagesById[conversationId] ?? [],
@@ -145,6 +251,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       session,
       isLoggedIn: session !== null,
       conversations,
+      conversationsLoading,
       messagesById,
       showWelcome,
       setShowWelcome,
@@ -161,10 +268,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       getMessages,
       setConversationMessages,
       addConversation,
+      refreshConversations,
+      loadConversationMessages,
     }),
     [
       session,
       conversations,
+      conversationsLoading,
       messagesById,
       showWelcome,
       listening,
@@ -179,6 +289,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       getMessages,
       setConversationMessages,
       addConversation,
+      refreshConversations,
+      loadConversationMessages,
     ],
   )
 

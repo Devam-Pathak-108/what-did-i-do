@@ -78,7 +78,12 @@ function titleFromTranscript(text: string): string {
 export function SpeakCapture() {
   const navigate = useNavigate()
   const toast = useToast()
-  const { session, addConversation, setConversationMessages } = useDashboard()
+  const {
+    session,
+    addConversation,
+    setConversationMessages,
+    refreshConversations,
+  } = useDashboard()
 
   const [listening, setListening] = useState(false)
   const [value, setValue] = useState('')
@@ -185,6 +190,7 @@ export function SpeakCapture() {
         title: titleFromTranscript(rawData),
         createdAt: created.created_at,
       })
+      void refreshConversations()
 
       toast.success('Your message was sent.', 'Conversation started')
       setValue('')

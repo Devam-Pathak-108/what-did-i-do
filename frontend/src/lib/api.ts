@@ -152,6 +152,21 @@ export type ChatSessionResponse = {
   updated_at: string
 }
 
+export type ChatSessionListItem = {
+  session_id: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  first_message: string | null
+}
+
+export type ChatSessionListResponse = {
+  page: number
+  limit: number
+  total: number
+  sessions: ChatSessionListItem[]
+}
+
 export type ChatMessageItem = {
   message_id: string
   type: 'asked' | 'reply' | string
@@ -179,6 +194,23 @@ export function createChatSession(token: string) {
   return request<ChatSessionResponse>(
     '/api/chat/sessions',
     { method: 'POST' },
+    token,
+  )
+}
+
+/** GET /api/chat/sessions — paginated session list for history */
+export function listChatSessions(
+  token: string,
+  params?: { page?: number; limit?: number },
+) {
+  const search = new URLSearchParams()
+  if (params?.page != null) search.set('page', String(params.page))
+  if (params?.limit != null) search.set('limit', String(params.limit))
+  const qs = search.toString()
+
+  return request<ChatSessionListResponse>(
+    `/api/chat/sessions${qs ? `?${qs}` : ''}`,
+    { method: 'GET' },
     token,
   )
 }

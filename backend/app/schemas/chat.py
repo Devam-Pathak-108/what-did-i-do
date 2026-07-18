@@ -20,10 +20,7 @@ class ChatSessionListItem(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
-    first_message: str | None = Field(
-        default=None,
-        description="First user message (type=asked) in this session, if any",
-    )
+    first_message: str | None = None
 
 
 class ChatSessionListResponse(BaseModel):

@@ -36,7 +36,7 @@ async def list_chat_sessions(
     limit: int = Query(default=20, ge=1, le=100),
     current_user: dict[str, Any] = Depends(get_current_verified_user),
 ) -> ChatSessionListResponse:
-    """List all chat sessions for the current user, with first user message text."""
+    """Paginated list of the current user's chat sessions (newest first)."""
     result = await chat_service.list_sessions(
         user_id=current_user["id"],
         page=page,

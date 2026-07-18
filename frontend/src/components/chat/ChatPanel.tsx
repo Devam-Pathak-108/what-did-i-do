@@ -6,13 +6,15 @@ type ChatPanelProps = {
   title: string
   messages: ChatMessage[]
   userName: string
-  onSend: (text: string) => void
+  sending?: boolean
+  onSend: (text: string) => void | Promise<void>
 }
 
 export function ChatPanel({
   title,
   messages,
   userName,
+  sending = false,
   onSend,
 }: ChatPanelProps) {
   return (
@@ -27,7 +29,7 @@ export function ChatPanel({
       </header>
 
       <ChatMessageList messages={messages} userName={userName} />
-      <ChatComposer onSend={onSend} />
+      <ChatComposer disabled={sending} onSend={onSend} />
     </div>
   )
 }

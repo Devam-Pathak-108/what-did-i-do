@@ -5,6 +5,7 @@ import { ChatHistoryItem } from './ChatHistoryItem'
 type ChatHistoryListProps = {
   groups: ChatDayGroup[]
   activeId?: string | null
+  loading?: boolean
   onSelect?: (id: string) => void
 }
 
@@ -18,6 +19,7 @@ function formatTime(iso: string): string {
 export function ChatHistoryList({
   groups,
   activeId = null,
+  loading = false,
   onSelect,
 }: ChatHistoryListProps) {
   return (
@@ -26,7 +28,9 @@ export function ChatHistoryList({
         Chat History
       </h2>
 
-      {groups.length === 0 ? (
+      {loading ? (
+        <p className="px-2.5 py-2 text-sm text-text-muted">Loading sessions…</p>
+      ) : groups.length === 0 ? (
         <p className="px-2.5 py-2 text-sm text-text-muted">
           No conversations yet. Tap the mic to begin.
         </p>
