@@ -10,7 +10,13 @@ _db: AsyncIOMotorDatabase | None = None
 async def connect_to_mongo() -> None:
     global _client, _db
     settings = get_settings()
-    _client = AsyncIOMotorClient(settings.mongodb_uri, tlsCAFile=certifi.where())
+    uri = settings.mongodb_uri
+    # tlsCAFile forces TLS — only use it for Atlas / TLS-enabled URIs.
+    client_kwargs: dict = {}
+    if uri.startswith("mongodb+srv://") or "tls=true" in uri.lower():
+        client_kwargs["tlsCAFile"] = certifi.where()
+
+    _client = AsyncIOMotorClient(uri, **client_kwargs)
     _db = _client[settings.mongodb_db_name]
 
     await _db.users.create_index("email", unique=True)
