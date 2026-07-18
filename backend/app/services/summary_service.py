@@ -96,7 +96,20 @@ async def create_period_summary(
 
     day_summaries = await _fetch_day_summaries(user_id, range_start, range_end)
     reply = await chat_ai.generate_period_summary_reply(day_summaries)
-    score = float(await chat_ai.score_summary_productivity(reply))
+    if not isinstance(reply, str) or not reply.strip():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Period summary generator returned an empty result",
+        )
+
+    raw_score = await chat_ai.score_summary_productivity(reply)
+    try:
+        score = float(raw_score)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Productivity score must be a number between -1 and 1",
+        ) from exc
     # Normalize to one-decimal key used for GIF filenames (e.g. -0.4)
     score = float(format_score_key(score))
     gif_url = build_gif_url(score)
