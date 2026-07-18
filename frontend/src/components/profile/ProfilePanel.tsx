@@ -27,6 +27,7 @@ export function ProfilePanel({ token, onProfileLoaded }: ProfilePanelProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -34,6 +35,7 @@ export function ProfilePanel({ token, onProfileLoaded }: ProfilePanelProps) {
     async function load() {
       setLoading(true)
       setLoadFailed(false)
+      setIsEditing(false)
       try {
         const data = await getProfile(token)
         if (cancelled) return
@@ -56,6 +58,15 @@ export function ProfilePanel({ token, onProfileLoaded }: ProfilePanelProps) {
     }
   }, [token, onProfileLoaded, toast.error])
 
+  function handleEdit() {
+    setIsEditing(true)
+  }
+
+  function handleCancel() {
+    setAbout(profile?.tell_me_about_your_life ?? '')
+    setIsEditing(false)
+  }
+
   async function handleSave(event: FormEvent) {
     event.preventDefault()
     setSaving(true)
@@ -63,6 +74,7 @@ export function ProfilePanel({ token, onProfileLoaded }: ProfilePanelProps) {
       const updated = await updateProfile(token, about.trim())
       setProfile(updated)
       setAbout(updated.tell_me_about_your_life ?? '')
+      setIsEditing(false)
       onProfileLoaded?.(updated)
       toast.success('Your profile details were updated.', 'Profile saved')
     } catch (err) {
@@ -74,6 +86,10 @@ export function ProfilePanel({ token, onProfileLoaded }: ProfilePanelProps) {
 
   const dirty =
     profile !== null && about.trim() !== (profile.tell_me_about_your_life ?? '').trim()
+
+  const aboutDisplay = about.trim()
+    ? about
+    : 'No description yet. Click Edit to tell us about your life.'
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto px-6 py-6">
@@ -122,27 +138,57 @@ export function ProfilePanel({ token, onProfileLoaded }: ProfilePanelProps) {
             </dl>
 
             <form className="space-y-3" onSubmit={handleSave}>
-              <label className="flex flex-col gap-1.5 text-left">
+              <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-medium text-text">
                   Tell me about your life
                 </span>
+                {!isEditing ? (
+                  <Button type="button" variant="outline" onClick={handleEdit}>
+                    Edit
+                  </Button>
+                ) : null}
+              </div>
+
+              {isEditing ? (
                 <textarea
                   rows={6}
                   value={about}
                   onChange={(event) => setAbout(event.target.value)}
                   disabled={saving}
+                  autoFocus
                   placeholder="Share routines, goals, or anything that helps personalize your memory assistant…"
-                  className="resize-y rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-text placeholder:text-text-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
+                  className="w-full resize-y rounded-lg border border-border bg-transparent px-3 py-2 text-sm text-text placeholder:text-text-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1"
                 />
-              </label>
+              ) : (
+                <p
+                  className={[
+                    'rounded-lg border border-border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap',
+                    about.trim() ? 'text-text' : 'text-text-muted',
+                  ].join(' ')}
+                >
+                  {aboutDisplay}
+                </p>
+              )}
 
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={saving || !dirty}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </Button>
+              {isEditing ? (
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleCancel}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={saving || !dirty}
+                  >
+                    {saving ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+              ) : null}
             </form>
           </div>
         ) : null}
@@ -150,3 +196,4 @@ export function ProfilePanel({ token, onProfileLoaded }: ProfilePanelProps) {
     </div>
   )
 }
+

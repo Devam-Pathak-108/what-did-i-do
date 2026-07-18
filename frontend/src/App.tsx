@@ -1,13 +1,30 @@
-import { DashboardPage } from './pages/DashboardPage'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ToastProvider } from './components/ui/toast-context'
 import { ToastViewport } from './components/ui/ToastViewport'
+import { DashboardProvider } from './context/DashboardProvider'
+import { DashboardLayout } from './layouts/DashboardLayout'
+import { HomePage } from './pages/HomePage'
+import { ProfilePage } from './pages/ProfilePage'
+import { ChatPage } from './pages/ChatPage'
 
 function App() {
   return (
-    <ToastProvider>
-      <DashboardPage />
-      <ToastViewport />
-    </ToastProvider>
+    <BrowserRouter>
+      <ToastProvider>
+        <DashboardProvider>
+          <Routes>
+            <Route element={<DashboardLayout />}>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/chat" element={<ChatPage />} />
+              <Route path="/chat/:conversationId" element={<ChatPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </DashboardProvider>
+        <ToastViewport />
+      </ToastProvider>
+    </BrowserRouter>
   )
 }
 

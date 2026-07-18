@@ -1,42 +1,27 @@
-type SidebarNavProps = {
-  active: 'profile' | 'chats'
-  onProfileClick: () => void
-  onChatsClick: () => void
+import { NavLink, useLocation } from 'react-router-dom'
+
+function navClass(isActive: boolean) {
+  return [
+    'flex w-full rounded-lg px-2.5 py-2 text-left text-sm font-medium transition-colors',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+    isActive
+      ? 'bg-accent-soft text-accent'
+      : 'text-text hover:bg-surface-muted',
+  ].join(' ')
 }
 
-export function SidebarNav({
-  active,
-  onProfileClick,
-  onChatsClick,
-}: SidebarNavProps) {
+export function SidebarNav() {
+  const location = useLocation()
+  const chatsActive = location.pathname.startsWith('/chat')
+
   return (
     <nav className="mb-4 space-y-1 px-1" aria-label="Main">
-      <button
-        type="button"
-        onClick={onProfileClick}
-        className={[
-          'flex w-full rounded-lg px-2.5 py-2 text-left text-sm font-medium transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-          active === 'profile'
-            ? 'bg-accent-soft text-accent'
-            : 'text-text hover:bg-surface-muted',
-        ].join(' ')}
-      >
+      <NavLink to="/profile" className={({ isActive }) => navClass(isActive)}>
         My Profile
-      </button>
-      <button
-        type="button"
-        onClick={onChatsClick}
-        className={[
-          'flex w-full rounded-lg px-2.5 py-2 text-left text-sm font-medium transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-          active === 'chats'
-            ? 'bg-accent-soft text-accent'
-            : 'text-text hover:bg-surface-muted',
-        ].join(' ')}
-      >
+      </NavLink>
+      <NavLink to="/chat" className={() => navClass(chatsActive)}>
         Chats
-      </button>
+      </NavLink>
     </nav>
   )
 }
