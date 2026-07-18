@@ -20,7 +20,10 @@ export function SidebarNav() {
         My Profile
       </NavLink>
       <NavLink to="/chat" className={() => navClass(chatsActive)}>
-        Chats
+        Chat
+      </NavLink>
+      <NavLink to="/summary" className={({ isActive }) => navClass(isActive)}>
+        Chat Summary
       </NavLink>
     </nav>
   )

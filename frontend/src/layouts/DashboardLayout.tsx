@@ -7,7 +7,6 @@ import { ChatHistoryList } from '../components/history/ChatHistoryList'
 import { AboutApp } from '../components/about/AboutApp'
 import { AuthDialog } from '../components/auth/AuthDialog'
 import { Button } from '../components/ui/Button'
-import { mockConversations } from '../data/mockConversations'
 import { useDashboard } from '../context/useDashboard'
 
 export function DashboardLayout() {
@@ -16,6 +15,7 @@ export function DashboardLayout() {
   const {
     session,
     isLoggedIn,
+    conversations,
     openAuth,
     closeAuth,
     authOpen,
@@ -30,7 +30,8 @@ export function DashboardLayout() {
 
   const isProtectedRoute =
     location.pathname.startsWith('/profile') ||
-    location.pathname.startsWith('/chat')
+    location.pathname.startsWith('/chat') ||
+    location.pathname.startsWith('/summary')
 
   if (!isLoggedIn && isProtectedRoute) {
     return (
@@ -94,7 +95,11 @@ export function DashboardLayout() {
               <>
                 <SidebarNav />
                 <ChatHistoryList
-                  groups={mockConversations}
+                  groups={
+                    conversations.length > 0
+                      ? [{ dateLabel: 'Recent', items: conversations }]
+                      : []
+                  }
                   activeId={activeChatId}
                   onSelect={(id) => {
                     navigate(`/chat/${id}`)

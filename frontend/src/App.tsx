@@ -6,6 +6,7 @@ import { DashboardLayout } from './layouts/DashboardLayout'
 import { HomePage } from './pages/HomePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ChatPage } from './pages/ChatPage'
+import { SummaryPage } from './pages/SummaryPage'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/chat" element={<ChatPage />} />
               <Route path="/chat/:conversationId" element={<ChatPage />} />
+              <Route path="/summary" element={<SummaryPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

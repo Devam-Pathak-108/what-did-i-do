@@ -212,3 +212,80 @@ export function getChatMessages(
     token,
   )
 }
+
+export type SummaryType = 'date_range' | 'month'
+
+export type SummaryCreatePayload =
+  | {
+      type: 'date_range'
+      start_date: string
+      end_date: string
+      month?: number
+      year?: number
+    }
+  | {
+      type: 'month'
+      month: number
+      year: number
+      start_date?: string
+      end_date?: string
+    }
+
+export type SummaryCreateResponse = {
+  summary_id: string
+  type: SummaryType
+  start_date: string
+  end_date: string
+  reply: string
+  score: number
+  gif_url: string
+}
+
+export type SummaryItem = {
+  summary_id: string
+  type: SummaryType
+  start_date: string
+  end_date: string
+  month: number | null
+  year: number | null
+  reply: string
+  score: number
+  gif_url: string
+  created_at: string
+}
+
+export type SummaryListResponse = {
+  page: number
+  limit: number
+  total: number
+  summaries: SummaryItem[]
+}
+
+/** POST /api/summary — create a date-range or month summary */
+export function createSummary(token: string, payload: SummaryCreatePayload) {
+  return request<SummaryCreateResponse>(
+    '/api/summary',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    token,
+  )
+}
+
+/** GET /api/summary — list saved summaries (paginated) */
+export function listSummaries(
+  token: string,
+  params?: { page?: number; limit?: number },
+) {
+  const search = new URLSearchParams()
+  if (params?.page != null) search.set('page', String(params.page))
+  if (params?.limit != null) search.set('limit', String(params.limit))
+  const qs = search.toString()
+
+  return request<SummaryListResponse>(
+    `/api/summary${qs ? `?${qs}` : ''}`,
+    { method: 'GET' },
+    token,
+  )
+}

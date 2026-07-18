@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { getProfile, type ProfileResponse } from '../lib/api'
 import { clearSession, loadSession, saveSession } from '../lib/session'
 import type { AuthMode, AuthSession } from '../types/auth'
-import type { ChatMessage } from '../types/chat'
-import { mockMessagesByConversation } from '../data/mockMessages'
+import type { ChatMessage, Conversation } from '../types/chat'
 import { useToast } from '../components/ui/toast-context'
 import {
   DashboardContext,
@@ -33,8 +32,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [listening, setListening] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [conversations, setConversations] = useState<Conversation[]>([])
   const [messagesById, setMessagesById] = useState<Record<string, ChatMessage[]>>(
-    () => structuredClone(mockMessagesByConversation),
+    {},
   )
 
   const handleProfileLoaded = useCallback((profile: ProfileResponse) => {
@@ -88,8 +88,27 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     setSession(null)
     setShowWelcome(false)
     setListening(false)
+    setConversations([])
+    setMessagesById({})
     toast.info('You have been signed out.', 'Logged out')
   }, [toast])
+
+  const setConversationMessages = useCallback(
+    (conversationId: string, messages: ChatMessage[]) => {
+      setMessagesById((prev) => ({
+        ...prev,
+        [conversationId]: messages,
+      }))
+    },
+    [],
+  )
+
+  const addConversation = useCallback((conversation: Conversation) => {
+    setConversations((prev) => {
+      if (prev.some((item) => item.id === conversation.id)) return prev
+      return [conversation, ...prev]
+    })
+  }, [])
 
   const handleSend = useCallback((conversationId: string, text: string) => {
     const now = new Date().toISOString()
@@ -125,6 +144,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       isLoggedIn: session !== null,
+      conversations,
       messagesById,
       showWelcome,
       setShowWelcome,
@@ -139,9 +159,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       handleProfileLoaded,
       handleSend,
       getMessages,
+      setConversationMessages,
+      addConversation,
     }),
     [
       session,
+      conversations,
       messagesById,
       showWelcome,
       listening,
@@ -154,6 +177,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       handleProfileLoaded,
       handleSend,
       getMessages,
+      setConversationMessages,
+      addConversation,
     ],
   )
 
