@@ -99,3 +99,31 @@ async def merge_replies(reply_from_type_0: str, reply_from_type_1: str) -> str:
         reply: Single merged conversational reply.
     """
     ...
+
+
+async def generate_period_summary_reply(summaries: list[dict[str, Any]]) -> str:
+    """
+    Generate a period summary reply from type-0 day summaries.
+
+    Params:
+        summaries: Day summaries fetched from DB for the requested range/month.
+
+    Returns:
+        reply: Conversational period summary string.
+    """
+    ...
+
+
+async def score_summary_productivity(reply: str) -> float:
+    """
+    Score how productive the user was based on the final summary reply.
+
+    Params:
+        reply: Final summary reply text.
+
+    Returns:
+        score: Float in [-1, 1].
+            Negative — not productive through the period.
+            Positive — productive through the period.
+    """
+    ...
