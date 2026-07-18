@@ -16,6 +16,16 @@ async def connect_to_mongo() -> None:
     await _db.users.create_index("username", unique=True)
     await _db.otps.create_index("expires_at", expireAfterSeconds=0)
 
+    # Chat: sessions + messages (UI history) + day_summaries (type-0 recall/history)
+    await _db.chat_sessions.create_index([("user_id", 1), ("is_active", 1), ("updated_at", -1)])
+    await _db.chat_messages.create_index(
+        [("user_id", 1), ("session_id", 1), ("visible_in_chat", 1), ("datetime", -1)]
+    )
+    await _db.chat_messages.create_index([("session_id", 1), ("datetime", -1)])
+    await _db.day_summaries.create_index([("user_id", 1), ("entry_date", 1), ("created_at", 1)])
+    await _db.day_summaries.create_index([("user_id", 1), ("date", -1)])
+    await _db.recalls.create_index([("user_id", 1), ("entry_date", 1), ("created_at", -1)])
+
 
 async def close_mongo_connection() -> None:
     global _client, _db
