@@ -148,13 +148,7 @@ function AuthDialogPanel({
         password,
       })
 
-      // OTP is required on every login.
-      await beginOtpStep({
-        userId: token.user_id,
-        email: token.email,
-        username: token.username,
-        password,
-      })
+      finishWithToken(token)
     } catch (err) {
       toast.error(errorMessage(err))
     } finally {

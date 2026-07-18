@@ -138,3 +138,77 @@ export function updateProfile(token: string, tellMeAboutYourLife: string) {
     token,
   )
 }
+
+export type ChatSessionResponse = {
+  session_id: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type ChatMessageItem = {
+  message_id: string
+  type: 'asked' | 'reply' | string
+  message: string
+  datetime: string
+  session_id: string
+  intent?: number | null
+}
+
+export type ChatSendResponse = {
+  session_id: string
+  messages: ChatMessageItem[]
+}
+
+export type ChatHistoryResponse = {
+  session_id: string
+  page: number
+  limit: number
+  total: number
+  messages: ChatMessageItem[]
+}
+
+/** POST /api/chat/sessions — create a new chat session */
+export function createChatSession(token: string) {
+  return request<ChatSessionResponse>(
+    '/api/chat/sessions',
+    { method: 'POST' },
+    token,
+  )
+}
+
+/** POST /api/chat — send a message in a session */
+export function sendChatMessage(
+  token: string,
+  payload: { raw_data: string; session_id: string },
+) {
+  return request<ChatSendResponse>(
+    '/api/chat',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    token,
+  )
+}
+
+/** GET /api/chat/messages — paginated history for a session */
+export function getChatMessages(
+  token: string,
+  params: {
+    session_id: string
+    page?: number
+    limit?: number
+  },
+) {
+  const search = new URLSearchParams()
+  search.set('session_id', params.session_id)
+  if (params.page != null) search.set('page', String(params.page))
+  if (params.limit != null) search.set('limit', String(params.limit))
+
+  return request<ChatHistoryResponse>(
+    `/api/chat/messages?${search.toString()}`,
+    { method: 'GET' },
+    token,
+  )
+}
