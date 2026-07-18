@@ -1,6 +1,12 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:8000'
 
+export function resolveApiUrl(pathOrUrl: string): string {
+  if (!pathOrUrl) return pathOrUrl
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl
+  return `${API_BASE_URL}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`
+}
+
 export class ApiError extends Error {
   status: number
   detail: string
