@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import close_mongo_connection, connect_to_mongo
-from app.routers import auth, chat, profile
+from app.routers import auth, chat, gifs, profile, summary
 
 
 @asynccontextmanager
@@ -35,6 +35,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(profile.router, prefix="/api")
     app.include_router(chat.router, prefix="/api")
+    app.include_router(summary.router, prefix="/api")
+    app.include_router(gifs.router, prefix="/api")
 
     @app.get("/health")
     async def health():

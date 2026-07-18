@@ -8,6 +8,13 @@ class ChatSendRequest(BaseModel):
     session_id: str | None = None
 
 
+class ChatSessionResponse(BaseModel):
+    session_id: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class ChatMessageItem(BaseModel):
     message_id: str
     type: str = Field(description='"asked" or "reply"')

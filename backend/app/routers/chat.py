@@ -7,10 +7,26 @@ from app.schemas.chat import (
     ChatHistoryResponse,
     ChatSendRequest,
     ChatSendResponse,
+    ChatSessionResponse,
 )
 from app.services import chat_service
+from app.utils.datetime_ist import to_ist
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+
+
+@router.post("/sessions", response_model=ChatSessionResponse, status_code=201)
+async def create_chat_session(
+    current_user: dict[str, Any] = Depends(get_current_verified_user),
+) -> ChatSessionResponse:
+    """Create a new chat session and return its session_id."""
+    session = await chat_service.create_session(current_user["id"])
+    return ChatSessionResponse(
+        session_id=str(session["_id"]),
+        is_active=session["is_active"],
+        created_at=to_ist(session["created_at"]),
+        updated_at=to_ist(session["updated_at"]),
+    )
 
 
 @router.post("", response_model=ChatSendResponse)

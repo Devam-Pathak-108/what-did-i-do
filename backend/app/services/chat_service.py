@@ -32,10 +32,35 @@ def _serialize_message(doc: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+async def create_session(user_id: str, *, make_active: bool = True) -> dict[str, Any]:
+    """Explicitly create a new chat session and return it (session_id = _id)."""
+    db = get_database()
+    user_oid = _as_object_id(user_id, "user_id")
+    now = now_ist()
+
+    if make_active:
+        # New chat becomes the current active session.
+        await db.chat_sessions.update_many(
+            {"user_id": user_oid, "is_active": True},
+            {"$set": {"is_active": False, "updated_at": now}},
+        )
+
+    doc = {
+        "user_id": user_oid,
+        "is_active": True,
+        "created_at": now,
+        "updated_at": now,
+    }
+    result = await db.chat_sessions.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return doc
+
+
 async def get_or_create_session(user_id: str, session_id: str | None = None) -> dict[str, Any]:
     db = get_database()
     user_oid = _as_object_id(user_id, "user_id")
 
+    # Client-supplied id: lookup only (never invent that id).
     if session_id:
         session = await db.chat_sessions.find_one(
             {"_id": _as_object_id(session_id, "session_id"), "user_id": user_oid}
@@ -54,16 +79,7 @@ async def get_or_create_session(user_id: str, session_id: str | None = None) -> 
     if session is not None:
         return session
 
-    now = now_ist()
-    doc = {
-        "user_id": user_oid,
-        "is_active": True,
-        "created_at": now,
-        "updated_at": now,
-    }
-    result = await db.chat_sessions.insert_one(doc)
-    doc["_id"] = result.inserted_id
-    return doc
+    return await create_session(user_id, make_active=True)
 
 
 async def _touch_session(session_id: ObjectId) -> None:

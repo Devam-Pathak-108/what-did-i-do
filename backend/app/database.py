@@ -25,6 +25,8 @@ async def connect_to_mongo() -> None:
     await _db.day_summaries.create_index([("user_id", 1), ("entry_date", 1), ("created_at", 1)])
     await _db.day_summaries.create_index([("user_id", 1), ("date", -1)])
     await _db.recalls.create_index([("user_id", 1), ("entry_date", 1), ("created_at", -1)])
+    await _db.period_summaries.create_index([("user_id", 1), ("created_at", -1)])
+    await _db.period_summaries.create_index([("user_id", 1), ("start_date", 1), ("end_date", 1)])
 
 
 async def close_mongo_connection() -> None:

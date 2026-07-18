@@ -1,6 +1,9 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
@@ -15,6 +18,9 @@ class Settings(BaseSettings):
 
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db_name: str = "what_did_i_do"
+
+    # Folder of productivity GIFs named by score (e.g. -0.4.gif)
+    gifs_dir: str = str(_BACKEND_ROOT / "gifs")
 
     jwt_secret_key: str = "change-me-to-a-long-random-secret"
     jwt_algorithm: str = "HS256"
