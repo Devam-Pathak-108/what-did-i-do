@@ -1,11 +1,17 @@
 import logging
+import ssl
+from email.message import EmailMessage
 
 import aiosmtplib
-from email.message import EmailMessage
+import certifi
 
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+def _tls_context() -> ssl.SSLContext:
+    return ssl.create_default_context(cafile=certifi.where())
 
 
 async def send_otp_email(to_email: str, otp: str) -> None:
@@ -32,11 +38,23 @@ async def send_otp_email(to_email: str, otp: str) -> None:
     message["Subject"] = subject
     message.set_content(body)
 
-    await aiosmtplib.send(
-        message,
-        hostname=settings.smtp_host,
-        port=settings.smtp_port,
-        username=settings.smtp_username,
-        password=settings.smtp_password,
-        start_tls=settings.smtp_use_tls,
-    )
+    try:
+        await aiosmtplib.send(
+            message,
+            hostname=settings.smtp_host,
+            port=settings.smtp_port,
+            username=settings.smtp_username,
+            password=settings.smtp_password,
+            start_tls=settings.smtp_use_tls,
+            tls_context=_tls_context(),
+        )
+    except Exception:
+        # Local/dev: don't fail the whole OTP flow if SMTP TLS is broken.
+        if settings.debug:
+            logger.exception(
+                "SMTP send failed; OTP for %s (debug fallback): %s",
+                to_email,
+                otp,
+            )
+            return
+        raise
