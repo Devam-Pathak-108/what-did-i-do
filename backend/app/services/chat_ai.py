@@ -1,8 +1,8 @@
-"""AI helpers for chat, backed by the Groq chat-completions API.
+"""AI helpers for chat, backed by the Gemini generateContent API.
 
-These implement the text-to-text flow: raw user text in, LLM-generated text
-out. Prompt wording lives in the top-level ``prompt`` module so it can be tuned
-without touching this logic.
+These implement the text-to-text flow: raw user text (raw_data) comes in from
+the backend, the LLM produces the reply text. Prompt wording lives in the
+top-level ``prompt`` module so it can be tuned without touching this logic.
 """
 
 import asyncio
@@ -13,44 +13,54 @@ from typing import Any
 import requests
 
 import prompt as prompts
-from app.config import GROQ_API_KEY, GROQ_CHAT_URL, GROQ_MODEL
-from app.utils.datetime_ist import IST, ist_date, now_ist, to_ist
+from app.config import GEMINI_API_BASE, GEMINI_API_KEY, GEMINI_MODEL
+from app.utils.datetime_ist import IST, ist_date, now_ist
 
 
-async def _groq_chat(
+async def _gemini_chat(
     system_prompt: str,
     user_prompt: str,
     *,
     temperature: float = 0.3,
     max_tokens: int = 512,
 ) -> str:
-    """Call the Groq chat-completions API and return the reply text."""
-    if not GROQ_API_KEY:
+    """Call the Gemini generateContent API and return the reply text."""
+    if not GEMINI_API_KEY:
         raise RuntimeError(
-            "GROQ_API_KEY (or CURSOR_API_KEY) is not set in the .env file."
+            "CURSOR_API_KEY (or GEMINI_API_KEY) is not set in the .env file."
         )
 
+    url = f"{GEMINI_API_BASE}/models/{GEMINI_MODEL}:generateContent"
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY,
     }
     body = {
-        "model": GROQ_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+        "generationConfig": {
+            "temperature": temperature,
+            # Gemini 2.5+ models spend tokens on "thinking"; keep budget at 0
+            # so short classification replies don't hit MAX_TOKENS empty.
+            "thinkingConfig": {"thinkingBudget": 0},
+            "maxOutputTokens": max(max_tokens, 64),
+        },
     }
 
     def _call() -> dict[str, Any]:
-        response = requests.post(GROQ_CHAT_URL, headers=headers, json=body, timeout=60)
+        response = requests.post(url, headers=headers, json=body, timeout=60)
         response.raise_for_status()
         return response.json()
 
     payload = await asyncio.to_thread(_call)
-    return payload["choices"][0]["message"]["content"].strip()
+    try:
+        parts = payload["candidates"][0]["content"]["parts"]
+        texts = [p["text"] for p in parts if isinstance(p, dict) and p.get("text")]
+        if not texts:
+            raise KeyError("parts")
+        return "\n".join(texts).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise RuntimeError(f"Unexpected Gemini response: {payload}") from exc
 
 
 def _format_history(conversation_history: list[dict[str, Any]] | None) -> str:
@@ -76,14 +86,37 @@ def _parse_date(text: str) -> datetime:
     return datetime.combine(parsed, time.min, tzinfo=IST)
 
 
-def _format_memories(summaries: list[dict[str, Any]]) -> str:
-    """Render stored day summaries into text for the answer prompt."""
+def _parse_score(text: str) -> float:
+    """Parse a productivity score, clamped to the [-1, 1] range."""
+    match = re.search(r"-?\d+(?:\.\d+)?", text or "")
+    if not match:
+        return 0.0
+    return max(-1.0, min(1.0, float(match.group())))
+
+
+def _summaries_as_lines(summaries: list[dict[str, Any]]) -> list[str]:
+    """Render stored day summaries as '[date] summary' strings."""
     lines: list[str] = []
     for item in summaries:
         day = item.get("entry_date") or ""
         summary = item.get("summary") or item.get("raw_data") or ""
         lines.append(f"[{day}] {summary}")
-    return "\n".join(lines)
+    return lines
+
+
+def _format_memories(summaries: list[dict[str, Any]]) -> str:
+    """Render stored day summaries into a single block for the answer prompt."""
+    return "\n".join(_summaries_as_lines(summaries))
+
+
+def _period_label(summaries: list[dict[str, Any]]) -> str:
+    """Build a human-readable label for the range covered by the summaries."""
+    dates = sorted(s.get("entry_date") for s in summaries if s.get("entry_date"))
+    if not dates:
+        return "the selected period"
+    if dates[0] == dates[-1]:
+        return dates[0]
+    return f"{dates[0]} to {dates[-1]}"
 
 
 async def classify_intent(raw_data: str) -> int:
@@ -95,7 +128,7 @@ async def classify_intent(raw_data: str) -> int:
         1 — user is asking what they did on a particular date
         2 — user is both telling about the day and asking about the past
     """
-    content = await _groq_chat(
+    content = await _gemini_chat(
         prompts.INTENT_CLASSIFICATION_SYSTEM_PROMPT,
         prompts.build_intent_classification_prompt(raw_data),
         temperature=0.0,
@@ -115,13 +148,13 @@ async def extract_daily_life(raw_data: str) -> dict[str, Any]:
         {"date": datetime (IST), "summary": str}
     """
     reference_date = ist_date(now_ist()).isoformat()
-    date_text = await _groq_chat(
+    date_text = await _gemini_chat(
         prompts.DATE_EXTRACTION_SYSTEM_PROMPT,
         prompts.build_date_extraction_prompt(raw_data, reference_date),
         temperature=0.0,
         max_tokens=16,
     )
-    summary = await _groq_chat(
+    summary = await _gemini_chat(
         prompts.DAILY_SUMMARY_SYSTEM_PROMPT,
         prompts.build_daily_summary_prompt(raw_data),
         temperature=0.3,
@@ -135,7 +168,7 @@ async def generate_daily_reply(
     conversation_history: list[dict[str, Any]] | None = None,
 ) -> str:
     """Generate a conversational reply for a daily-life (type 0) message."""
-    return await _groq_chat(
+    return await _gemini_chat(
         prompts.DAILY_REPLY_SYSTEM_PROMPT,
         prompts.build_daily_reply_prompt(
             raw_data,
@@ -154,7 +187,7 @@ async def extract_recall_query(raw_data: str) -> dict[str, Any]:
         {"date": datetime (IST), "specifics_to_fetch": str}
     """
     reference_date = ist_date(now_ist()).isoformat()
-    date_text = await _groq_chat(
+    date_text = await _gemini_chat(
         prompts.DATE_EXTRACTION_SYSTEM_PROMPT,
         prompts.build_date_extraction_prompt(raw_data, reference_date),
         temperature=0.0,
@@ -170,7 +203,7 @@ async def generate_recall_reply(
 ) -> str:
     """Generate a conversational reply from stored type-0 summaries."""
     memories = _format_memories(summaries)
-    return await _groq_chat(
+    return await _gemini_chat(
         prompts.ANSWER_SYSTEM_PROMPT,
         prompts.build_answer_prompt(specifics_to_fetch, memories),
         temperature=0.4,
@@ -179,18 +212,13 @@ async def generate_recall_reply(
 
 
 async def merge_replies(reply_from_type_0: str, reply_from_type_1: str) -> str:
-    """
-    Merge daily-life and recall replies into one chat reply (type 2).
-
-    Params:
-        reply_from_type_0: Reply produced by the type-0 flow.
-        reply_from_type_1: Reply produced by the type-1 flow
-            (including the friendly empty-day message when needed).
-
-    Returns:
-        reply: Single merged conversational reply.
-    """
-    ...
+    """Merge daily-life and recall replies into one chat reply (type 2)."""
+    return await _gemini_chat(
+        prompts.MERGE_REPLIES_SYSTEM_PROMPT,
+        prompts.build_merge_replies_prompt(reply_from_type_0, reply_from_type_1),
+        temperature=0.5,
+        max_tokens=400,
+    )
 
 
 async def generate_period_summary_reply(summaries: list[dict[str, Any]]) -> str:
@@ -203,7 +231,13 @@ async def generate_period_summary_reply(summaries: list[dict[str, Any]]) -> str:
     Returns:
         reply: Conversational period summary string.
     """
-    ...
+    lines = _summaries_as_lines(summaries)
+    return await _gemini_chat(
+        prompts.PERIOD_SUMMARY_SYSTEM_PROMPT,
+        prompts.build_period_summary_prompt(lines, _period_label(summaries)),
+        temperature=0.4,
+        max_tokens=500,
+    )
 
 
 async def score_summary_productivity(reply: str) -> float:
@@ -218,11 +252,10 @@ async def score_summary_productivity(reply: str) -> float:
             Negative — not productive through the period.
             Positive — productive through the period.
     """
-    ...
-    """Merge daily-life and recall replies into one chat reply (type 2)."""
-    return await _groq_chat(
-        prompts.MERGE_REPLIES_SYSTEM_PROMPT,
-        prompts.build_merge_replies_prompt(reply_from_type_0, reply_from_type_1),
-        temperature=0.5,
-        max_tokens=400,
+    content = await _gemini_chat(
+        prompts.PRODUCTIVITY_RATING_SYSTEM_PROMPT,
+        prompts.build_productivity_rating_prompt([reply]),
+        temperature=0.0,
+        max_tokens=8,
     )
+    return _parse_score(content)

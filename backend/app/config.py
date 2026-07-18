@@ -60,11 +60,12 @@ ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech"
 ELEVENLABS_TTS_MODEL = "eleven_multilingual_v2"
 ELEVENLABS_VOICE_ID = "cgSgspJ2msm6clMCkdW9"  # Jessica
 
-# --- Groq (summarization) ---
-# Per request the key is read from CURSOR_API_KEY; GROQ_API_KEY is a fallback.
-GROQ_API_KEY = os.getenv("CURSOR_API_KEY") or os.getenv("GROQ_API_KEY", "")
-GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+# --- Gemini (text generation / summarization) ---
+# Auth: CURSOR_API_KEY is preferred; GEMINI_API_KEY is a fallback.
+# Free-tier models: gemini-2.5-flash or gemini-3-flash-preview
+GEMINI_API_KEY = os.getenv("CURSOR_API_KEY") or os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
 # --- Storage ---
 DATA_DIR = PROJECT_ROOT / "backend" / "data"

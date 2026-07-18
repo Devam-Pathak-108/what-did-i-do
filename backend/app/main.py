@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import close_mongo_connection, connect_to_mongo
-from app.routers import auth, chat, entries, profile
+from app.routers import auth, chat, entries, gifs, profile, summary
 
 
 @asynccontextmanager
