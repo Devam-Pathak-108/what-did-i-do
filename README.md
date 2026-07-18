@@ -11,6 +11,46 @@ By analyzing historical data, the AI offers personalized recommendations to prom
 ```
 what-do-i-do/
 ├── frontend/    # Client application
-├── backend/     # Server and API
+├── backend/     # FastAPI + MongoDB API
 └── README.md
 ```
+
+## Backend
+
+Tech stack: **Python FastAPI** + **MongoDB**
+
+### Setup
+
+```bash
+cd backend
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+# source .venv/bin/activate
+
+pip install -r requirements.txt
+cp .env.example .env   # then edit SMTP / Mongo settings
+```
+
+Start MongoDB locally, then run:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+API docs: http://localhost:8000/docs
+
+### Auth flow
+
+1. `POST /api/auth/register` — username, email, password  
+2. `POST /api/auth/send-otp` — user_id  
+3. `POST /api/auth/verify-otp` — user_id, otp  
+4. `POST /api/auth/login` — identifier (username or email), password → JWT  
+
+Protected routes use `Authorization: Bearer <token>` via shared JWT middleware (`get_current_user` / `get_current_verified_user`).
+
+### Profile
+
+- `GET /api/profile` — current user profile  
+- `PUT /api/profile` — update `tell_me_about_your_life`
