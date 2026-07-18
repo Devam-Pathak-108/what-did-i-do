@@ -168,9 +168,9 @@ export function ChatComposer({ onSend, disabled = false }: ChatComposerProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-t border-border bg-surface px-4 py-3"
+      className="shrink-0 px-4 pb-4 pt-2"
     >
-      <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-bg px-2 py-2">
+      <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-border bg-transparent px-2 py-2">
         <IconButton
           label={listening ? 'Stop speaking' : 'Speak into message'}
           size="md"

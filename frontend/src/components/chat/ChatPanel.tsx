@@ -16,8 +16,8 @@ export function ChatPanel({
   onSend,
 }: ChatPanelProps) {
   return (
-    <div className="flex h-full min-h-0 flex-col bg-bg">
-      <header className="shrink-0 border-b border-border bg-surface px-6 py-4">
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="shrink-0 border-b border-border px-6 py-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
           Conversation
         </p>
